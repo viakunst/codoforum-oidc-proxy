@@ -27,17 +27,16 @@ if (isset($_SESSION['access_token'])) {
 }
 
 // refresh access token if access token was expired
-if (!$user && isset($_SESSION['refresh_token']) && $_SESSION['refresh_token']) {
-    $oidc->refreshToken($_SESSION['refresh_token']);
+if (!$user && isset($_COOKIE['refresh_token'])) {
+    $oidc->refreshToken($_COOKIE['refresh_token']);
     $_SESSION['access_token'] = $oidc->getAccessToken();
-    $_SESSION['refresh_token'] = $oidc->getRefreshToken();
+    store_refresh($oidc);
     try {
         $user = $oidc->requestUserInfo();
     } catch (OpenIDConnectClientException $e) {
         // connection has failed
-        $oidc->setAccessToken(null);
         unset($_SESSION['access_token']);
-        unset($_SESSION['refresh_token']);
+        destroy_refresh();
         http_response_code(500);
         echo 'Problem with OIDC server';
         die;
@@ -47,11 +46,12 @@ if (!$user && isset($_SESSION['refresh_token']) && $_SESSION['refresh_token']) {
 Route::add('/login', function() use ($config, $oidc) {
     $oidc->authenticate();
     $_SESSION['access_token'] = $oidc->getAccessToken();
-    $_SESSION['refresh_token'] = $oidc->getRefreshToken();
+    store_refresh($oidc);
     header('Location: '.$config['forum_redirect']);
 });
 
 Route::add('/logout', function() use ($config, $oidc) {
+    destroy_refresh();
     if (isset($_SESSION['access_token'])) {
         $token = $_SESSION['access_token'];
         session_destroy();
@@ -81,3 +81,19 @@ Route::add('/user', function() use ($config, $user) {
 });
 
 Route::run('/');
+
+function store_refresh($oidc) {
+    $refresh = $oidc->getRefreshToken();
+    if (!$refresh) {
+        destroy_refresh();
+        return;
+    }
+
+    $expire = time()+60*60*24*30; // 30 days from now
+    $domain = parse_url($oidc->getRedirectURL(), PHP_URL_HOST);
+    setcookie('refresh_token', $refresh, $expire, '/', $domain, true, true);
+}
+
+function destroy_refresh() {
+    setcookie('refresh_token', "", time()-3600); // one hour ago 
+}
