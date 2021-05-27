@@ -95,5 +95,8 @@ function store_refresh($oidc) {
 }
 
 function destroy_refresh() {
-    setcookie('refresh_token', "", time()-3600); // one hour ago 
+    if (isset($_COOKIE['refresh_token'])) {
+        unset($_COOKIE['refresh_token']); 
+        setcookie('refresh_token', "", time()-3600, '/');// one hour ago 
+    }
 }
