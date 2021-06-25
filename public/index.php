@@ -37,9 +37,6 @@ if (!$user && isset($_COOKIE['refresh_token'])) {
         // connection has failed
         unset($_SESSION['access_token']);
         destroy_refresh();
-        http_response_code(500);
-        echo 'Problem with OIDC server';
-        die;
     }
 }
 
